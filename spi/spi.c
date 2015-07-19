@@ -8,25 +8,25 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include "spi.h"
+#include "../main.h"
 
 
 
 
 void spiInit(void)
 {
-	
 	DDRSPI |= (1<<MOSI) | (1<<SCK) | (1<<SS);
 	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR0);
 	CSN_HIGH;
-	
-	printf("init SPI SPCR : %x", SPCR);
+#if DEBUG
+	printf("init SPI SPCR : %x\n", SPCR);
+#endif
 	//printf("spi init .. \n");
 }
-void spiTransmit(unsigned char spiData){
-	CSN_LOW;
+unsigned char spiTransmit(unsigned char spiData){
 	SPDR = spiData;
 	while(!(SPSR & (1<<SPIF)));
-	CSN_HIGH;
+	return SPDR;
 }
 unsigned char spiRead(void){
 	return SPDR;

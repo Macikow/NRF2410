@@ -19,8 +19,8 @@
 #define CSN_HIGH (SPI_PORT|= (1<<SS))
 #define CSN_LOW (SPI_PORT &= ~(1<<SS))
 
-void spiIinit(void);
-void spiTransmit(unsigned char spiData);
+void spiInit(void);
+unsigned char spiTransmit(unsigned char spiData);
 unsigned char spiRead(void);
 
 #endif /* SPI_H_ */

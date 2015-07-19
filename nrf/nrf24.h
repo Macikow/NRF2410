@@ -74,42 +74,43 @@ void    nrf24_writeRegister(unsigned char reg, unsigned char* value, unsigned ch
  *    - Set CSN pin output
  *    - Set CE pin output     */
 /* -------------------------------------------------------------------------- */
-extern void nrf24_setupPins();
+void nrf24_setupPins();
 
 /* -------------------------------------------------------------------------- */
 /* nrf24 CE pin control function
  *    - state:1 => Pin HIGH
  *    - state:0 => Pin LOW     */
 /* -------------------------------------------------------------------------- */
-extern void nrf24_ce_digitalWrite(unsigned char state);
+void nrf24_ce_digitalWrite(unsigned char state);
 
 /* -------------------------------------------------------------------------- */
 /* nrf24 CE pin control function
  *    - state:1 => Pin HIGH
  *    - state:0 => Pin LOW     */
 /* -------------------------------------------------------------------------- */
-extern void nrf24_csn_digitalWrite(unsigned char state);
+void nrf24_csn_digitalWrite(unsigned char state);
 
 /* -------------------------------------------------------------------------- */
 /* nrf24 SCK pin control function
  *    - state:1 => Pin HIGH
  *    - state:0 => Pin LOW     */
 /* -------------------------------------------------------------------------- */
-extern void nrf24_sck_digitalWrite(unsigned char state);
+void nrf24_sck_digitalWrite(unsigned char state);
 
 /* -------------------------------------------------------------------------- */
 /* nrf24 MOSI pin control function
  *    - state:1 => Pin HIGH
  *    - state:0 => Pin LOW     */
 /* -------------------------------------------------------------------------- */
-extern void nrf24_mosi_digitalWrite(unsigned char state);
+void nrf24_mosi_digitalWrite(unsigned char state);
 
 /* -------------------------------------------------------------------------- */
 /* nrf24 MISO pin read function
 /* - returns: Non-zero if the pin is high */
 /* -------------------------------------------------------------------------- */
-extern unsigned char nrf24_miso_digitalRead();
-
+unsigned char nrf24_miso_digitalRead();
+unsigned char nrf24_readSingleRegister(unsigned char reg);
+void nrf24_writeSingleRegister(unsigned char reg, unsigned char val);
 
 
 

@@ -10,6 +10,7 @@
 #include <avr/interrupt.h>
 #include <stdio.h>
 #include "mu_termdefs.h"
+#include "../main.h"
 
 
 
@@ -23,7 +24,9 @@ void USART_init(void){
 	UBRR0H = (unsigned char) 0x00;
 	UCSR0B = ((1<<TXEN0) | (1<<RXEN0) | (1<<RXCIE0));
 	printf("%s%sRozpoczêcie porgramu ver1\n",ERASE_SCREEN,CURSOR_HOME);
+#if DEBUG == 1
 	printf("inicjalizacja USART - OK \n");
+#endif
 	sei();
 }
 

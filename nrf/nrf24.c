@@ -7,6 +7,8 @@
 #include <avr/io.h>
 #include "nrf24.h"
 #include "../spi/spi.h"
+#include <stdio.h>
+#include "../main.h"
 
 
 /************************************************************************/
@@ -16,6 +18,8 @@
 #define PORT_IRQ_AND_CE PORTG 
 #define IRQ PG0 
 #define CE	PG2
+
+
 
 
 #define CE_HIGH (PORT_IRQ_AND_CE|= (1<<CE))
@@ -47,12 +51,15 @@ void nrf24_csn_digitalWrite(unsigned char status){
 	
 }
 void nrf24_setupPins(){
-	spiIinit();
+	spiInit();
 	DDR_IRQ_AND_CE |= (1<CE); // CE -output IRQ input
 }
 
 void nrf24_init()
 {
+#if DEBUG
+	printf("inicjalizacja nrf24l01..\n");
+#endif
 	nrf24_setupPins();
 	nrf24_ce_digitalWrite(LOW);
 	nrf24_csn_digitalWrite(HIGH);
@@ -61,6 +68,11 @@ void nrf24_init()
 /* configure the module */
 void nrf24_config(unsigned char channel, unsigned char pay_length)
 {
+	
+	unsigned char register_table[29]={15,12};
+#if DEBUG
+	printf("konfiguracja nrf24l10 : kana³: %d, d³ugoœæ strumiena danych = %d bjtów\n",channel,pay_length);
+#endif
 	/* Use static payload length ... */
 	payload_len = pay_length;
 
@@ -92,9 +104,21 @@ void nrf24_config(unsigned char channel, unsigned char pay_length)
 
 	// Dynamic length configurations: No dynamic length
 	nrf24_configRegister(DYNPD,(0<<DPL_P0)|(0<<DPL_P1)|(0<<DPL_P2)|(0<<DPL_P3)|(0<<DPL_P4)|(0<<DPL_P5));
-
+	
 	// Start listening
 	nrf24_powerUpRx();
+	
+
+//#if DEBUG
+	printf("ustawienia rejestrów :\n");
+	//nrf24_readRegisters(0x00,&register_table ,29);
+	for(unsigned char i=0;i<0x1d;i++){
+		printf("register[%d] = 0x%x \n",i,nrf24_readSingleRegister(i));
+	}
+	
+//#endif
+
+	
 }
 
 /* Set the RX address */
@@ -151,8 +175,8 @@ unsigned char nrf24_payloadLength()
 {
 	unsigned char status;
 	nrf24_csn_digitalWrite(LOW);
-	spi_transfer(R_RX_PL_WID);
-	status = spi_transfer(0x00);
+	spiTransmit(R_RX_PL_WID);
+	status = spiTransmit(0x00);
 	nrf24_csn_digitalWrite(HIGH);
 	return status;
 }
@@ -164,7 +188,7 @@ void nrf24_getData(unsigned char* data)
 	nrf24_csn_digitalWrite(LOW);
 
 	/* Send cmd to read rx payload */
-	spi_transfer( R_RX_PAYLOAD );
+	spiTransmit( R_RX_PAYLOAD );
 	
 	/* Read payload */
 	nrf24_transferSync(data,data,payload_len);
@@ -187,7 +211,7 @@ unsigned char nrf24_retransmissionCount()
 
 // Sends a data package to the default address. Be sure to send the correct
 // amount of bytes as configured as payload on the receiver.
-void nrf24_send(unsigned char* value)
+void nrf24_send(unsigned char* val)
 {
 	/* Go to Standby-I first */
 	nrf24_ce_digitalWrite(LOW);
@@ -201,7 +225,7 @@ void nrf24_send(unsigned char* value)
 	nrf24_csn_digitalWrite(LOW);
 
 	/* Write cmd to flush transmit FIFO */
-	spi_transfer(FLUSH_TX);
+	spiTransmit(FLUSH_TX);
 
 	/* Pull up chip select */
 	nrf24_csn_digitalWrite(HIGH);
@@ -211,10 +235,10 @@ void nrf24_send(unsigned char* value)
 	nrf24_csn_digitalWrite(LOW);
 
 	/* Write cmd to write payload */
-	spi_transfer(W_TX_PAYLOAD);
+	spiTransmit(W_TX_PAYLOAD);
 
 	/* Write payload */
-	nrf24_transmitSync(value,payload_len);
+	nrf24_transmitSync(val,payload_len);
 
 	/* Pull up chip select */
 	nrf24_csn_digitalWrite(HIGH);
@@ -244,7 +268,7 @@ unsigned char nrf24_getStatus()
 {
 	unsigned char rv;
 	nrf24_csn_digitalWrite(LOW);
-	rv = spi_transfer(NOP);
+	rv = spiTransmit(NOP);
 	nrf24_csn_digitalWrite(HIGH);
 	return rv;
 }
@@ -276,12 +300,11 @@ unsigned char nrf24_lastMessageStatus()
 void nrf24_powerUpRx()
 {
 	nrf24_csn_digitalWrite(LOW);
-	spi_transfer(FLUSH_RX);
+	spiTransmit(FLUSH_RX);
 	nrf24_csn_digitalWrite(HIGH);
 
-	nrf24_configRegister(STATUS,(1<<RX_DR)|(1<<TX_DS)|(1<<MAX_RT));
-
 	nrf24_ce_digitalWrite(LOW);
+	nrf24_configRegister(STATUS,(1<<RX_DR)|(1<<TX_DS)|(1<<MAX_RT));
 	nrf24_configRegister(CONFIG,nrf24_CONFIG|((1<<PWR_UP)|(1<<PRIM_RX)));
 	nrf24_ce_digitalWrite(HIGH);
 }
@@ -300,48 +323,49 @@ void nrf24_powerDown()
 }
 
 /* software spi routine */
-unsigned char spi_transfer(unsigned char tx)
-{
-	unsigned char i = 0;
-	unsigned char rx = 0;
-
-	nrf24_sck_digitalWrite(LOW);
-
-	for(i=0;i<8;i++)
-	{
-
-		if(tx & (1<<(7-i)))
-		{
-			nrf24_mosi_digitalWrite(HIGH);
-		}
-		else
-		{
-			nrf24_mosi_digitalWrite(LOW);
-		}
-
-		nrf24_sck_digitalWrite(HIGH);
-
-		rx = rx << 1;
-		if(nrf24_miso_digitalRead())
-		{
-			rx |= 0x01;
-		}
-
-		nrf24_sck_digitalWrite(LOW);
-
-	}
-
-	return rx;
-}
+// unsigned char spiTransmit(unsigned char tx)
+// {
+// 	unsigned char i = 0;
+// 	unsigned char rx = 0;
+// 
+// 	nrf24_sck_digitalWrite(LOW);
+// 
+// 	for(i=0;i<8;i++)
+// 	{
+// 
+// 		if(tx & (1<<(7-i)))
+// 		{
+// 			nrf24_mosi_digitalWrite(HIGH);
+// 		}
+// 		else
+// 		{
+// 			nrf24_mosi_digitalWrite(LOW);
+// 		}
+// 
+// 		nrf24_sck_digitalWrite(HIGH);
+// 
+// 		rx = rx << 1;
+// 		if(nrf24_miso_digitalRead())
+// 		{
+// 			rx |= 0x01;
+// 		}
+// 
+// 		nrf24_sck_digitalWrite(LOW);
+// 
+// 	}
+// 
+// 	return rx;
+// }
 
 /* send and receive multiple bytes over SPI */
 void nrf24_transferSync(unsigned char* dataout,unsigned char* datain,unsigned char len)
 {
 	unsigned char i;
 
-	for(i=0;i<len;i++)
+for(i=0;i<len;i++)
 	{
-		datain[i] = spi_transfer(dataout[i]);
+		printf("0x%x",dataout[i]);
+		datain[i] = spiTransmit(dataout[i]);
 	}
 
 }
@@ -353,34 +377,78 @@ void nrf24_transmitSync(unsigned char* dataout,unsigned char len)
 	
 	for(i=0;i<len;i++)
 	{
-		spi_transfer(dataout[i]);
+		spiTransmit(dataout[i]);
 	}
 
 }
 
 /* Clocks only one byte into the given nrf24 register */
-void nrf24_configRegister(unsigned char reg, unsigned char value)
+void nrf24_configRegister(unsigned char reg, unsigned char val)
 {
 	nrf24_csn_digitalWrite(LOW);
-	spi_transfer(W_REGISTER | (REGISTER_MASK & reg));
-	spi_transfer(value);
+	spiTransmit(W_REGISTER | (REGISTER_MASK & reg));
+	spiTransmit(val);
 	nrf24_csn_digitalWrite(HIGH);
 }
 
 /* Read single register from nrf24 */
-void nrf24_readRegister(unsigned char reg, unsigned char* value, unsigned char len)
+/************************************************************************/
+/*  reg - first register to read
+	val - data to send 
+	len - size of val                                                                      */
+/************************************************************************/
+void nrf24_readRegister(unsigned char reg, unsigned char* val, unsigned char len)
 {
 	nrf24_csn_digitalWrite(LOW);
-	spi_transfer(R_REGISTER | (REGISTER_MASK & reg));
-	nrf24_transferSync(value,value,len);
+	spiTransmit(R_REGISTER | (REGISTER_MASK & reg));
+	nrf24_transferSync(0xff,val,len); // val
 	nrf24_csn_digitalWrite(HIGH);
 }
 
 /* Write to a single register of nrf24 */
-void nrf24_writeRegister(unsigned char reg, unsigned char* value, unsigned char len)
+void nrf24_writeRegister(unsigned char reg, unsigned char* val, unsigned char len)
 {
 	nrf24_csn_digitalWrite(LOW);
-	spi_transfer(W_REGISTER | (REGISTER_MASK & reg));
-	nrf24_transmitSync(value,len);
+	spiTransmit(W_REGISTER | (REGISTER_MASK & reg));
+	nrf24_transmitSync(val,len);
+	nrf24_csn_digitalWrite(HIGH);
+}
+
+void nrf24_writeSingleRegister(unsigned char reg, unsigned char val)
+{
+	nrf24_csn_digitalWrite(LOW);
+	spiTransmit(W_REGISTER | (REGISTER_MASK & reg));
+	spiTransmit(val);
+	nrf24_csn_digitalWrite(HIGH);
+}
+
+unsigned char nrf24_readSingleRegister(unsigned char reg)
+{
+	nrf24_csn_digitalWrite(LOW);
+	spiTransmit(R_REGISTER | (REGISTER_MASK & reg));
+	spiTransmit(NOP);
+	nrf24_csn_digitalWrite(HIGH);
+	return SPDR;
+}
+
+void nrf24_transferRead(unsigned char* datain,unsigned char len)
+{
+	unsigned char i;
+
+	for(i=0;i<len;i++)
+	{
+		printf("%d : %d  --->",i,datain[i]);	
+		datain[i] = spiTransmit(0xff);
+		printf("%d : %d\n",i,datain[i]);	
+	}
+
+}
+
+void nrf24_readRegisters(unsigned char reg, unsigned char* val, unsigned char len)
+{
+	nrf24_csn_digitalWrite(LOW);
+	printf("readRegister : %d %d %d",reg,*val,len);
+	spiTransmit(R_REGISTER | (REGISTER_MASK & reg));
+	nrf24_transferRead(val,len); // val
 	nrf24_csn_digitalWrite(HIGH);
 }
